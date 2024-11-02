@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="소스 파일">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="헤더 파일">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="리소스 파일">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="소스 파일\LibraryCpp">
+      <UniqueIdentifier>{7ecb0225-2f22-443c-8f73-ff7e5856f66b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\LibraryHeader">
+      <UniqueIdentifier>{0b3973f4-1482-434e-9ad9-7b8b7d0a8582}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\ChatServerCpp">
+      <UniqueIdentifier>{e155709c-36da-462b-97c1-26975fdea7d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\ChatServerHeader">
+      <UniqueIdentifier>{f7b23c92-2d6e-4cd8-b323-089b0f2aba6d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\NetServer\NetServer\Parser.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\Session.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\CAddressTranslator.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\CLockFreeObjectPool.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\CLockFreeQueue.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\CLockFreeStack.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\CTlsObjectPool.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\ErrType.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\IHandler.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\Logger.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\NetServer.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\NetServer\NetServer\Packet.h">
+      <Filter>헤더 파일\LibraryHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="CLinkedList.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="CMessageQ.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonProtocol.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="CSCContents.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="Job.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="Player.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SCCContents.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="Sector.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatServer.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\NetServer\NetServer\RingBuffer.cpp">
+      <Filter>소스 파일\LibraryCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\NetServer\NetServer\Session.cpp">
+      <Filter>소스 파일\LibraryCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\NetServer\NetServer\NetServer.cpp">
+      <Filter>소스 파일\LibraryCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="CLinkedList.cpp">
+      <Filter>소스 파일\ChatServerCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="CMessageQ.cpp">
+      <Filter>소스 파일\ChatServerCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="CSCContents.cpp">
+      <Filter>소스 파일\ChatServerCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>소스 파일\ChatServerCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="SCCContents.cpp">
+      <Filter>소스 파일\ChatServerCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Sector.cpp">
+      <Filter>소스 파일\ChatServerCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="update.cpp">
+      <Filter>소스 파일\ChatServerCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatServer.cpp">
+      <Filter>소스 파일\ChatServerCpp</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
