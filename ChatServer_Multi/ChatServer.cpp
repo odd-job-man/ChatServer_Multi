@@ -13,8 +13,7 @@
 
 #include "Parser.h"
 
-bool PacketProc_PACKET(Player* pPlayer, SmartPacket& sp);
-extern CMessageQ g_MQ[2][2];
+bool PacketProc_PACKET(Player* pPlayer, SmartPacket& rcvdPacket);
 extern SECTOR_AROUND g_sectorAround[50][50];
 
 ChatServer g_ChatServer;
@@ -34,7 +33,7 @@ ChatServer::ChatServer()
 	{
 		for (short x = 0; x < NUM_OF_SECTOR_HORIZONTAL; ++x)
 		{
-			GetSectorAround(y, x, &g_sectorAround[y][x]);
+			GetSectorAround(x, y, &g_sectorAround[y][x]);
 		}
 	}
 }
@@ -51,7 +50,6 @@ void* ChatServer::OnAccept(ULONGLONG id)
 {
 	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(id);
 	// 컨텐츠에서 해당 플레이어 포인터를 사용하던 중에 재활용 되는것을 막기
-	AcquireSRWLockExclusive(&pPlayer->playerLock_);
 
 	if (pPlayer->bUsing_ == true)
 		__debugbreak();
@@ -61,16 +59,12 @@ void* ChatServer::OnAccept(ULONGLONG id)
 	pPlayer->bRegisterAtSector_ = false;
 	pPlayer->sessionId_ = id;
 	pPlayer->LastRecvedTime_ = GetTickCount64();
-
-	ReleaseSRWLockExclusive(&pPlayer->playerLock_);
 	return nullptr;
 }
 
 void ChatServer::OnRelease(ULONGLONG id)
 {
 	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(id);
-	// 컨텐츠에서 해당 플레이어 포인터를 사용하던 중에 재활용 되는것을 막기
-	AcquireSRWLockExclusive(&pPlayer->playerLock_);
 
 	if (pPlayer->bUsing_ == false)
 		__debugbreak();
@@ -82,21 +76,17 @@ void ChatServer::OnRelease(ULONGLONG id)
 		if (pPlayer->bRegisterAtSector_ == true)
 		{
 			Job* pJob = Job::Alloc(en_JOB_TYPE::en_JOB_ON_RELEASE_REMOVE_PLAYER_AT_SECTOR, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->sessionId_);
-			g_MQ[pPlayer->sectorY_ / SECTOR_DENOMINATOR][pPlayer->sectorX_ / SECTOR_DENOMINATOR].Enqueue(pJob);
+			Job::Enqueue(pJob, GetOrder(pPlayer->sectorX_, pPlayer->sectorY_));
 		}
 		InterlockedDecrement(&lPlayerNum);
 	}
-
-	ReleaseSRWLockExclusive(&pPlayer->playerLock_);
 }
 
 void ChatServer::OnRecv(ULONGLONG id, Packet* pPacket)
 {
 	SmartPacket sp = std::move(pPacket);
 	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(id);
-	AcquireSRWLockShared(&pPlayer->playerLock_);
 	PacketProc_PACKET(pPlayer, sp);
-	ReleaseSRWLockShared(&pPlayer->playerLock_);
 }
 
 void ChatServer::OnError(ULONGLONG id, int errorType, Packet* pRcvdPacket)
@@ -117,10 +107,26 @@ void ChatServer::OnError(ULONGLONG id, int errorType, Packet* pRcvdPacket)
 	}
 }
 
-void ChatServer::Monitoring(int updateCnt, unsigned long long BuffersProcessAtThisFrame)
+void PQCS(int order);
+
+void ChatServer::OnPost(int order)
 {
+	PQCS(order);
+}
+
+void ChatServer::Monitoring()
+{
+	int cap = 0;
+	unsigned long long workerEnqueuedBufCnt = 0;
+
+	for (int i = 0; i < 4; ++i)
+	{
+		cap = Job::messageQ[i].packetPool_.capacity_;
+		workerEnqueuedBufCnt = Job::messageQ[i].workerEnqueuedBufferCnt_;
+	}
+
 	printf(
-		"update Count : %llu\n"
+		"update Count : %d\n"
 		"Packet Pool Alloc Capacity : %d\n"
 		"MessageQ Capacity : %d\n"
 		"MessageQ Queued By Worker : %llu\n"
@@ -134,10 +140,10 @@ void ChatServer::Monitoring(int updateCnt, unsigned long long BuffersProcessAtTh
 		"Player Num : %d\n"
 		"REQ_MESSAGE_TPS : %d\n"
 		"RES_MESSAGE_TPS : %d\n\n",
-		BuffersProcessAtThisFrame,
+		PQCS_UPDATE_CNT_,
 		Packet::packetPool_.capacity_,
-		g_MQ.packetPool_.capacity_,
-		g_MQ.workerEnqueuedBufferCnt_,
+		cap,
+		workerEnqueuedBufCnt,
 		pSessionArr_[0].sendPacketQ_.nodePool_.capacity_,
 		lAcceptTotal_ - lAcceptTotal_PREV,
 		lAcceptTotal_,
@@ -150,6 +156,8 @@ void ChatServer::Monitoring(int updateCnt, unsigned long long BuffersProcessAtTh
 		RES_MESSAGE_TPS);
 
 	lAcceptTotal_PREV = lAcceptTotal_;
+
+	InterlockedExchange(&PQCS_UPDATE_CNT_, 0);
 	InterlockedExchange(&lDisconnectTPS_, 0);
 	InterlockedExchange(&lRecvTPS_, 0);
 	InterlockedExchange(&lSendTPS_, 0);

@@ -144,7 +144,6 @@
     <ClInclude Include="..\..\NetServer\NetServer\Parser.h" />
     <ClInclude Include="..\..\NetServer\NetServer\Session.h" />
     <ClInclude Include="ChatServer.h" />
-    <ClInclude Include="CLinkedList.h" />
     <ClInclude Include="CMessageQ.h" />
     <ClInclude Include="CommonProtocol.h" />
     <ClInclude Include="CSCContents.h" />
@@ -158,9 +157,9 @@
     <ClCompile Include="..\..\NetServer\NetServer\RingBuffer.cpp" />
     <ClCompile Include="..\..\NetServer\NetServer\Session.cpp" />
     <ClCompile Include="ChatServer.cpp" />
-    <ClCompile Include="CLinkedList.cpp" />
     <ClCompile Include="CMessageQ.cpp" />
     <ClCompile Include="CSCContents.cpp" />
+    <ClCompile Include="Job.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="SCCContents.cpp" />
     <ClCompile Include="Sector.cpp" />

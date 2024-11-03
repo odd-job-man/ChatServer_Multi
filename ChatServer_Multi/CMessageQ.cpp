@@ -1,6 +1,8 @@
 #include <WinSock2.h>
 #include "CMessageQ.h"
 
+CTlsObjectPool<CMessageQ::Node, true> CMessageQ::packetPool_;
+
 CMessageQ::CMessageQ()
 {
 		pTailForWorker_ = pHeadForWorker_ = packetPool_.Alloc();

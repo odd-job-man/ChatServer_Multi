@@ -17,13 +17,18 @@ struct SECTOR_AROUND
 };
 
 void GetSectorAround(SHORT sectorX, SHORT sectorY, SECTOR_AROUND* pOutSectorAround);
-void SendPacket_AROUND(const Player* pValidateTarget, ULONGLONG sessionId, SECTOR_AROUND* pSectorAround, SmartPacket& sp);
-void SendPacket_Sector_One(const Player* pValidateTarget, ULONGLONG sessionId, WORD sectorX, WORD sectorY, SmartPacket& sp);
-void RegisterClientAtSector(WORD sectorX, WORD sectorY, const Player* pPlayer);
-void RemoveClientAtSector(WORD sectorX, WORD sectorY, const Player* pPlayer);
-//void DebugForSectorProb(Player* pPlayer);
+void SendPacket_AROUND(ULONGLONG sessionId, SECTOR_AROUND* pSectorAround, SmartPacket& sp);
+void SendPacket_Sector_One(ULONGLONG sessionId, WORD sectorX, WORD sectorY, SmartPacket& sp);
+void SendPacket_Sector_Multiple(ULONGLONG sessionId, std::pair<WORD, WORD>* pPosArr, int len, SmartPacket& sp);
+void RegisterClientAtSector(WORD sectorX, WORD sectorY, ULONGLONG sesssionId);
+void RemoveClientAtSector(WORD sectorX, WORD sectorY, ULONGLONG sessionId);
 
 __forceinline bool IsNonValidSector(WORD sectorX, WORD sectorY)
 {
 	return !((0 <= sectorX) && (sectorX <= NUM_OF_SECTOR_VERTICAL)) && ((0 <= sectorY) && (sectorY <= NUM_OF_SECTOR_HORIZONTAL));
+}
+
+__forceinline int GetOrder(WORD sectorX, WORD sectorY)
+{
+	return (sectorY / SECTOR_DENOMINATOR) * 2 + (sectorX / SECTOR_DENOMINATOR);
 }

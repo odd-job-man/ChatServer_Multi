@@ -63,9 +63,6 @@
     <ClInclude Include="..\..\NetServer\NetServer\Packet.h">
       <Filter>헤더 파일\LibraryHeader</Filter>
     </ClInclude>
-    <ClInclude Include="CLinkedList.h">
-      <Filter>헤더 파일\ChatServerHeader</Filter>
-    </ClInclude>
     <ClInclude Include="CMessageQ.h">
       <Filter>헤더 파일\ChatServerHeader</Filter>
     </ClInclude>
@@ -101,9 +98,6 @@
     <ClCompile Include="..\..\NetServer\NetServer\NetServer.cpp">
       <Filter>소스 파일\LibraryCpp</Filter>
     </ClCompile>
-    <ClCompile Include="CLinkedList.cpp">
-      <Filter>소스 파일\ChatServerCpp</Filter>
-    </ClCompile>
     <ClCompile Include="CMessageQ.cpp">
       <Filter>소스 파일\ChatServerCpp</Filter>
     </ClCompile>
@@ -123,6 +117,9 @@
       <Filter>소스 파일\ChatServerCpp</Filter>
     </ClCompile>
     <ClCompile Include="ChatServer.cpp">
+      <Filter>소스 파일\ChatServerCpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Job.cpp">
       <Filter>소스 파일\ChatServerCpp</Filter>
     </ClCompile>
   </ItemGroup>

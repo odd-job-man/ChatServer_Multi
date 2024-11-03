@@ -1,26 +1,32 @@
 #include <WinSock2.h>
-#include "CSCContents.h"
+
+#include "Packet.h"
 #include "Sector.h"
 #include "ChatServer.h"
 #include "CMessageQ.h"
 #include "Job.h"
+#include "CSCContents.h"
+#include "SCCContents.h"
 
 thread_local int g_threadNumber;
-
-extern CMessageQ g_MQ[2][2];
 
 extern ChatServer g_ChatServer;
 
 SECTOR_AROUND g_sectorAround[50][50];
 
-void CS_CHAT_REQ_LOGIN(Player* pPlayer, INT64 AccountNo, const WCHAR* pID, const WCHAR* pNickName, const char* pSessionKey)
+void CS_CHAT_REQ_LOGIN(Player* pPlayer, SmartPacket& sp)
 {
-	// 플레이어수가 일정수 넘어가면 로그인 실패시킴
 	if (g_ChatServer.lPlayerNum >= Player::MAX_PLAYER_NUM)
 	{
 		g_ChatServer.Disconnect(pPlayer->sessionId_);
 		return;
 	}
+
+	INT64 AccountNo;
+	*sp >> AccountNo;
+	WCHAR* pID = (WCHAR*)sp->GetPointer(sizeof(WCHAR) * Player::ID_LEN);
+	WCHAR* pNickName = (WCHAR*)sp->GetPointer(sizeof(WCHAR) * Player::NICK_NAME_LEN);
+	char* pSessionKey = (char*)sp->GetPointer(sizeof(char) * Player::SESSION_KEY_LEN);
 
 	pPlayer->LastRecvedTime_ = GetTickCount64();
 	pPlayer->accountNo_ = AccountNo;
@@ -29,14 +35,25 @@ void CS_CHAT_REQ_LOGIN(Player* pPlayer, INT64 AccountNo, const WCHAR* pID, const
 	wcscpy_s(pPlayer->ID_, Player::ID_LEN, pID);
 	wcscpy_s(pPlayer->nickName_, Player::NICK_NAME_LEN, pNickName);
 
-	SmartPacket sp = PACKET_ALLOC(Net);
-	MAKE_CS_CHAT_RES_LOGIN(en_PACKET_CS_CHAT_RES_LOGIN, 1, AccountNo, sp);
-	g_ChatServer.SendPacket(pPlayer->sessionId_, sp);
-	++g_ChatServer.lPlayerNum;
+	SmartPacket sendPacket = PACKET_ALLOC(Net);
+	MAKE_CS_CHAT_RES_LOGIN(en_PACKET_CS_CHAT_RES_LOGIN, 1, AccountNo, sendPacket);
+	g_ChatServer.SendPacket(pPlayer->sessionId_, sendPacket);
+	InterlockedIncrement(&g_ChatServer.lPlayerNum);
 }
 
-void CS_CHAT_REQ_SECTOR_MOVE(Player* pPlayer, INT64 accountNo, WORD sectorX, WORD sectorY)
+void CS_CHAT_REQ_SECTOR_MOVE(Player* pPlayer, SmartPacket& sp)
 {
+	INT64 accountNo;
+	WORD sectorX;
+	WORD sectorY;
+	*sp >> accountNo >> sectorX >> sectorY;
+
+	if (sp->IsBufferEmpty() == false)
+	{
+		g_ChatServer.Disconnect(pPlayer->sessionId_);
+		return;
+	}
+
 	if (pPlayer->accountNo_ != accountNo)
 	{
 		g_ChatServer.Disconnect(pPlayer->sessionId_);
@@ -50,34 +67,34 @@ void CS_CHAT_REQ_SECTOR_MOVE(Player* pPlayer, INT64 accountNo, WORD sectorX, WOR
 		return;
 	}
 
-	CMessageQ* pADD_JOBQ = &g_MQ[sectorY / SECTOR_DENOMINATOR][sectorX / SECTOR_DENOMINATOR];
-	CMessageQ* pREMOVE_JOBQ = &g_MQ[pPlayer->sectorY_ / SECTOR_DENOMINATOR][pPlayer->sectorX_ / SECTOR_DENOMINATOR];
+	Packet* pPacket = PACKET_ALLOC(Net);
+	MAKE_CS_CHAT_RES_SECTOR_MOVE(pPlayer->accountNo_, pPlayer->sectorX_, pPlayer->sectorY_, pPacket);
 
-	Job* pREQ_SECTOR_MOVE_ADD_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_ADD, sectorX, sectorY, pPlayer->sessionId_);
-	Job* pREQ_SECTOR_MOVE_REMOVE_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_REMOVE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->sessionId_);
+	Job* pREQ_SECTOR_MOVE_ADD_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_ADD, sectorX, sectorY, pPlayer->sessionId_, pPacket);
+	Job* pREQ_SECTOR_MOVE_REMOVE_JOB;
+
+	
+	Job::Enqueue(pREQ_SECTOR_MOVE_ADD_JOB, GetOrder(sectorX, sectorY));
+
+	if (pPlayer->bRegisterAtSector_ == false)
+		pPlayer->bRegisterAtSector_ = true;
+	else
+	{
+		pREQ_SECTOR_MOVE_REMOVE_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_REMOVE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->sessionId_, nullptr);
+		Job::Enqueue(pREQ_SECTOR_MOVE_REMOVE_JOB, GetOrder(pPlayer->sectorX_, pPlayer->sectorY_));
+	}
 
 	// 플레이어 섹터좌표 수정
 	pPlayer->sectorX_ = sectorX;
 	pPlayer->sectorY_ = sectorY;
 
-	InterlockedIncrement(&pREQ_SECTOR_MOVE_ADD_JOB->refCnt_);
-	InterlockedIncrement(&pREQ_SECTOR_MOVE_REMOVE_JOB->refCnt_);
-
-	pADD_JOBQ->Enqueue(pREQ_SECTOR_MOVE_ADD_JOB);
-	pREMOVE_JOBQ->Enqueue(pREQ_SECTOR_MOVE_REMOVE_JOB);
 }
 
-void CS_CHAT_REQ_SECTOR_MOVE_JOB_REMOVE(const Player* pPlayer, WORD sectorX, WORD sectorY)
+void CS_CHAT_REQ_SECTOR_MOVE_JOB_ADD(Job* pJob)
 {
-	RemoveClientAtSector(sectorX, sectorY, pPlayer);
-}
-
-void CS_CHAT_REQ_SECTOR_MOVE_JOB_ADD(const Player* pPlayer, INT64 accountNo, ULONGLONG sessionId, WORD sectorX, WORD sectorY)
-{
-	RegisterClientAtSector(sectorX, sectorY, pPlayer);
-	SmartPacket sp = PACKET_ALLOC(Net);
-	MAKE_CS_CHAT_RES_SECTOR_MOVE(accountNo, sectorX, sectorY, sp);
-	g_ChatServer.SendPacket(sessionId, sp);
+	RegisterClientAtSector(pJob->sectorX_, pJob->sectorY_, pJob->sessionId_);
+	SmartPacket sp = std::move(pJob->pPacket_);
+	g_ChatServer.SendPacket(pJob->sessionId_, sp);
 }
 
 void CS_CHAT_REQ_MESSAGE(Player* pPlayer, SmartPacket& sp)
@@ -88,12 +105,11 @@ void CS_CHAT_REQ_MESSAGE(Player* pPlayer, SmartPacket& sp)
 	*sp >> messageLen;
 	WCHAR* pMessage = (WCHAR*)sp->GetPointer(messageLen);
 
-	if (sp->IsBufferEmpty())
+	if (sp->IsBufferEmpty() == false)
 	{
 		g_ChatServer.Disconnect(pPlayer->sessionId_);
 		return;
 	}
-
 
 	// 디버깅용
 	if (pPlayer->accountNo_ != accountNo)
@@ -101,183 +117,97 @@ void CS_CHAT_REQ_MESSAGE(Player* pPlayer, SmartPacket& sp)
 		g_ChatServer.Disconnect(pPlayer->sessionId_);
 		return;
 	}
-
 	pPlayer->LastRecvedTime_ = GetTickCount64();
 
-	WORD sectorX = pPlayer->sectorX_;
-	WORD sectorY = pPlayer->sectorY_;
-
+	// 잡 처리용 스레드들에게 뿌릴 직렬화버퍼를 만든다 
 	Packet* pResPacket = PACKET_ALLOC(Net);
 	MAKE_CS_CHAT_RES_MESSAGE(accountNo, pPlayer->ID_, pPlayer->nickName_, messageLen, pMessage, pResPacket);
-	Job* pJob = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_MESSAGE, sectorX, sectorY, pPlayer->sessionId_, pResPacket);
 
-	// 해당함수 종료까지 Job의 수명이 종료되지 않아야해서 InterlockedIncrement
-	InterlockedIncrement(&pJob->refCnt_);
+	// Job에 직렬화버퍼를 등록함
+	Job* pJob = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_MESSAGE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->sessionId_, pResPacket);
 
-	bool bBoundary = false;
-	switch (sectorY)
+	SECTOR_AROUND* pSectorAround = &g_sectorAround[pPlayer->sectorY_][pPlayer->sectorX_];
+	bool bQuadrantArr[4] = { false };
+	for (int i = 0; i < pSectorAround->sectorCount; ++i)
 	{
-	case 23:
-	{
-		switch (sectorX)
+		int order = GetOrder(pSectorAround->Around[i].sectorX, pSectorAround->Around[i].sectorY);
+		if (bQuadrantArr[order] == false)
 		{
-		case 24:
-		case 25:
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			g_MQ[0][0].Enqueue(pJob);
-			g_MQ[0][1].Enqueue(pJob);
-			bBoundary = true;
-			break;
-		default:
-			break;
+			bQuadrantArr[order] = true;
+			Job::Enqueue(pJob, order);
 		}
-		break;
 	}
-	case 24:
+}
+
+__forceinline int GetPosArr(std::pair<WORD, WORD>* pOutPosArr, SECTOR_AROUND* pSectorAround, int order)
+{
+	int len = 0;
+	WORD quadrantY = order / 2;
+	WORD quadrantX = order % 2;
+
+	for (int i = 0; i < pSectorAround->sectorCount; ++i)
 	{
-		switch (sectorX)
+		if (pSectorAround->Around[i].sectorY / SECTOR_DENOMINATOR == quadrantY && pSectorAround->Around[i].sectorX / SECTOR_DENOMINATOR == quadrantX)
 		{
-		case 23:
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			g_MQ[0][0].Enqueue(pJob);
-			g_MQ[1][0].Enqueue(pJob);
-			bBoundary = true;
-			break;
-		case 24:
-		case 25:
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			g_MQ[0][0].Enqueue(pJob);
-			g_MQ[0][1].Enqueue(pJob);
-			g_MQ[1][0].Enqueue(pJob);
-			g_MQ[1][1].Enqueue(pJob);
-			bBoundary = true;
-			break;
-		case 26:
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			g_MQ[0][1].Enqueue(pJob);
-			g_MQ[1][1].Enqueue(pJob);
-			bBoundary = true;
-			break;
-		default:
-			break;
+			pOutPosArr[len] = { pSectorAround->Around[i].sectorY,pSectorAround->Around[i].sectorX };
+			++len;
 		}
-		break;
-	}
-	case 25:
-	{
-		switch (sectorX)
-		{
-		case 23:
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			g_MQ[0][0].Enqueue(pJob);
-			g_MQ[1][0].Enqueue(pJob);
-			bBoundary = true;
-			break;
-		case 24:
-		case 25:
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			g_MQ[0][0].Enqueue(pJob);
-			g_MQ[0][1].Enqueue(pJob);
-			g_MQ[1][0].Enqueue(pJob);
-			g_MQ[1][1].Enqueue(pJob);
-			bBoundary = true;
-			break;
-		case 26:
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			g_MQ[0][1].Enqueue(pJob);
-			g_MQ[1][1].Enqueue(pJob);
-			bBoundary = true;
-			break;
-		default:
-			break;
-		}
-		break;
-	}
-	case 26:
-	{
-		switch (sectorX)
-		{
-		case 24:
-		case 25:
-			InterlockedIncrement(&pJob->refCnt_);
-			InterlockedIncrement(&pJob->refCnt_);
-			g_MQ[1][0].Enqueue(pJob);
-			g_MQ[1][1].Enqueue(pJob);
-			bBoundary = true;
-			break;
-		default:
-			break;
-		}
-		break;
-	}
-	default:
-		break;
 	}
 
-	if (bBoundary == false)
-	{
-		InterlockedIncrement(&pJob->refCnt_);
-		g_MQ[sectorY / SECTOR_DENOMINATOR][sectorX / SECTOR_DENOMINATOR].Enqueue(pJob);
-	}
+	if (len == 0)
+		__debugbreak();
 
-	if (InterlockedDecrement(&pJob->refCnt_) == 0)
-		Job::Free(pJob);
+	return len;
 }
 
-void SendPacketThread0(WORD sectorX, WORD sectorY)
+void CS_CHAT_REQ_MESSAGE_JOB(Job* pJob, int order)
 {
-	switch (sectorY)
-	{
-	case 23:
-		break;
-	case 24:
-		break;
-	case 25:
-		break;
-	case 26:
-		break;
-	default:
-		break;
-	}
-}
-
-void SendPacketThread1()
-{
-
-}
-
-void SendPacketThread2()
-{
-	
-}
-
-void SendPacketThread3()
-{
-}
-
-void CS_CHAT_REQ_MESSAGE_JOB(Job* pJob)
-{
-	WORD sectorY = pJob->sectorY_;
-	WORD sectorX = pJob->sectorX_;
-
-	bool bBoundary = false;
 	SmartPacket sp = std::move(pJob->pPacket_);
-	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(pJob->sessionId_);
+	SECTOR_AROUND* pSectorAround = &g_sectorAround[pJob->sectorY_][pJob->sectorX_];
+	std::pair<WORD, WORD> pPosArr[9];
+	int len = GetPosArr(pPosArr, pSectorAround, order);
+	SendPacket_Sector_Multiple(pJob->sessionId_, pPosArr, len, sp);
+}
 
-	if (bBoundary == false)
+bool PacketProc_JOB(Job* pJob, int order)
+{
+	switch (pJob->jobType_)
 	{
-		SendPacket_AROUND(pPlayer, pJob->sessionId_, &g_sectorAround[sectorY][sectorX], sp);
+	case en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_REMOVE:
+		RemoveClientAtSector(pJob->sectorX_, pJob->sectorY_, pJob->sessionId_);
+		break;
+	case en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_ADD:
+		CS_CHAT_REQ_SECTOR_MOVE_JOB_ADD(pJob);
+		break;
+	case en_JOB_TYPE::en_JOB_CS_CHAT_REQ_MESSAGE:
+		CS_CHAT_REQ_MESSAGE_JOB(pJob, order);
+		break;
+	case en_JOB_TYPE::en_JOB_ON_RELEASE_REMOVE_PLAYER_AT_SECTOR:
+		RemoveClientAtSector(pJob->sectorX_, pJob->sectorY_, pJob->sessionId_);
+		break;
+	default:
+		break;
+	}
+	return true;
+}
+
+void PQCS(int order)
+{
+	if (order < 0 || order >= 4)
+		__debugbreak();
+
+	Job::Swap(order);
+	while (true)
+	{
+		Job* pJob = Job::Dequeue(order);
+		if (pJob == nullptr)
+			return;
+
+		PacketProc_JOB(pJob, order);
+		InterlockedIncrement(&g_ChatServer.PQCS_UPDATE_CNT_);
+
+		if (InterlockedDecrement(&pJob->refCnt_))
+			Job::Free(pJob);
 	}
 }
 

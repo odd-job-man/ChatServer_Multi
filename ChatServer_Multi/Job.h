@@ -1,5 +1,8 @@
 #pragma once
 #include "CTlsObjectPool.h"
+#include "Packet.h"
+#include "CMessageQ.h"
+
 enum class en_JOB_TYPE
 {
 	en_JOB_CS_CHAT_REQ_SECTOR_MOVE_REMOVE = 0,
@@ -16,19 +19,17 @@ public:
 	WORD sectorY_;
 	Packet* pPacket_;
 	ULONGLONG sessionId_;
-	Job(en_JOB_TYPE jobType, WORD sectorX, WORD sectorY, ULONGLONG sessionId, Packet* pPacket = nullptr, INT64 accountNo = 0)
+	LONG refCnt_;
+	static CMessageQ messageQ[4];
+	static inline CTlsObjectPool<Job,true> jobPool_;
+
+	Job(en_JOB_TYPE jobType, WORD sectorX, WORD sectorY, ULONGLONG sessionId, Packet* pPacket = nullptr)
 		:jobType_{ jobType }, sectorX_{ sectorX }, sectorY_{ sectorY }, sessionId_{ sessionId }, pPacket_{ pPacket }, refCnt_{ 0 }
 	{}
 
-	static inline CTlsObjectPool<Job,true> jobPool_;
-	LONG refCnt_;
-	static Job* Alloc(en_JOB_TYPE jobType, WORD sectorX, WORD sectorY, ULONGLONG sessionId, Packet* pPacket = nullptr)
-	{
-		return jobPool_.Alloc(jobType, sectorX, sectorY, sessionId, pPacket);
-	}
-
-	static void Free(Job* pJob)
-	{
-		return jobPool_.Free(pJob);
-	}
+	static Job* Alloc(en_JOB_TYPE jobType, WORD sectorX, WORD sectorY, ULONGLONG sessionId, Packet* pPacket = nullptr);
+	static void Free(Job* pJob);
+	static void Enqueue(Job* pJob, int order);
+	static Job* Dequeue(int order);
+	static void Swap(int order);
 };

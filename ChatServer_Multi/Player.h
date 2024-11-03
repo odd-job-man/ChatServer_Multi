@@ -1,6 +1,5 @@
 #pragma once
 #include<windows.h>
-#include "CLinkedList.h"
 
 struct Player
 {
@@ -16,18 +15,15 @@ struct Player
 	bool bRegisterAtSector_;
 	WORD sectorX_;
 	WORD sectorY_;
-	LINKED_NODE sectorLink;
 	ULONGLONG sessionId_;
 	INT64 accountNo_;
 	ULONGLONG LastRecvedTime_;
 	WCHAR ID_[ID_LEN];
 	WCHAR nickName_[NICK_NAME_LEN];
-	SRWLOCK playerLock_;
 	// 좀 애매함
 	Player()
-		:sectorLink{ offsetof(Player,sectorLink) }, bUsing_{ false }, bLogin_{ false }, bRegisterAtSector_{ false }
+		:bUsing_{ false }, bLogin_{ false }, bRegisterAtSector_{ false }
 	{
-		InitializeSRWLock(&playerLock_);
 	}
 
 	static WORD MAKE_PLAYER_INDEX(ULONGLONG sessionId)

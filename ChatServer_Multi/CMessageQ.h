@@ -1,6 +1,10 @@
 #pragma once
 #include <cstdint>
 #include "CAddressTranslator.h"
+#include "CTlsObjectPool.h"
+
+class CMessageQ;
+struct Job;
 #include "Job.h"
 
 #define NO_LOCK
@@ -24,7 +28,7 @@ public:
 		{}
 	};
 
-	CTlsObjectPool<Node, true> packetPool_;
+	static CTlsObjectPool<Node, true> packetPool_;
 	Node* pTailForWorker_;
 	Node* pHeadForWorker_;
 
@@ -32,7 +36,7 @@ public:
 	Node* pHeadForSingle_;
 public:
 	unsigned long long BuffersToProcessThisFrame_ = 0;
-	alignas(64) unsigned long long workerEnqueuedBufferCnt_ = 0;
+	unsigned long long workerEnqueuedBufferCnt_ = 0;
 
 #ifdef NO_LOCK
 	static constexpr uint64_t SWAP_FLAG = 0x8000000000000000;

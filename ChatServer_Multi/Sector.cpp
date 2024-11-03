@@ -1,7 +1,6 @@
 #include <WinSock2.h>
 #include <emmintrin.h>
 #include <list>
-#include "CLinkedList.h"
 #include "Packet.h"
 #include "Sector.h"
 #include "Player.h"
@@ -10,7 +9,7 @@
 #include "Logger.h"
 
 extern ChatServer g_ChatServer;
-std::list<Player*> listArr[NUM_OF_SECTOR_VERTICAL][NUM_OF_SECTOR_HORIZONTAL];
+std::list<ULONGLONG> listArr[NUM_OF_SECTOR_VERTICAL][NUM_OF_SECTOR_HORIZONTAL];
 
 
 void GetSectorAround(SHORT sectorX, SHORT sectorY, SECTOR_AROUND* pOutSectorAround)
@@ -79,64 +78,47 @@ void GetSectorAround(SHORT sectorX, SHORT sectorY, SECTOR_AROUND* pOutSectorArou
 	pOutSectorAround->sectorCount = sectorCount;
 }
 
-void RegisterClientAtSector(WORD sectorX, WORD sectorY, Player* pPlayer)
+void RegisterClientAtSector(WORD sectorX, WORD sectorY, ULONGLONG sessionId)
 {
-	listArr[sectorY][sectorX].push_back(pPlayer);
+	listArr[sectorY][sectorX].push_back(sessionId);
 }
 
-void RemoveClientAtSector(WORD sectorX, WORD sectorY, Player* pPlayer)
+void RemoveClientAtSector(WORD sectorX, WORD sectorY, ULONGLONG sessionId)
 {
-	listArr[sectorY][sectorX].remove(pPlayer);
+	listArr[sectorY][sectorX].remove(sessionId);
 }
 
 // pValidateTarget을 역참조해서 멤버를 활용하는 행위는 절대 안됨
-void SendPacket_AROUND(const Player* pValidateTarget, ULONGLONG sessionId, SECTOR_AROUND* pSectorAround, SmartPacket& sp)
+void SendPacket_AROUND(ULONGLONG sessionId, SECTOR_AROUND* pSectorAround, SmartPacket& sp)
 {
-	bool bAlreadySend = false;
 	for (int i = 0; i < pSectorAround->sectorCount; ++i)
 	{
-		for (Player* pPlayer : listArr[pSectorAround->Around[i].sectorY][pSectorAround->Around[i].sectorX])
+		for (ULONGLONG otherSessionId : listArr[pSectorAround->Around[i].sectorY][pSectorAround->Around[i].sectorX])
 		{
-			// REQ_MESSAGE 수신후 Release된 플레이어가 같은 섹터에 여러명 존재할때의 예외처리를 위해서 만듬
-			if (pValidateTarget == pPlayer)
-			{
-				if (bAlreadySend == true)
-					continue;
-
-				g_ChatServer.SendPacket(sessionId, sp);
-				bAlreadySend = true;
-			}
-			else
-			{
-				AcquireSRWLockShared(&pPlayer->playerLock_);
-				g_ChatServer.SendPacket(pPlayer->sessionId_, sp);
-				ReleaseSRWLockShared(&pPlayer->playerLock_);
-			}
+			g_ChatServer.SendPacket(otherSessionId, sp);
 			InterlockedIncrement(&g_ChatServer.REQ_MESSAGE_TPS);
 		}
 	}
 }
 
-void SendPacket_Sector_One(const Player* pValidateTarget, ULONGLONG sessionId, WORD sectorX, WORD sectorY, SmartPacket& sp)
+void SendPacket_Sector_One(ULONGLONG sessionId, WORD sectorX, WORD sectorY, SmartPacket& sp)
 {
-	bool bAlreadySend = false;
-	for (Player* pPlayer : listArr[sectorY][sectorX])
+	for (ULONGLONG otherSessionId : listArr[sectorY][sectorX])
 	{
-		// REQ_MESSAGE 수신후 Release된 플레이어가 같은 섹터에 여러명 존재할때의 예외처리를 위해서 만듬
-		if (pValidateTarget == pPlayer)
-		{
-			if (bAlreadySend == true)
-				continue;
-
-			g_ChatServer.SendPacket(sessionId, sp);
-			bAlreadySend = true;
-		}
-		else
-		{
-			AcquireSRWLockShared(&pPlayer->playerLock_);
-			g_ChatServer.SendPacket(pPlayer->sessionId_, sp);
-			ReleaseSRWLockShared(&pPlayer->playerLock_);
-		}
+		g_ChatServer.SendPacket(otherSessionId, sp);
 		InterlockedIncrement(&g_ChatServer.REQ_MESSAGE_TPS);
 	}
+}
+
+void SendPacket_Sector_Multiple(ULONGLONG sessionId, std::pair<WORD, WORD>* pPosArr, int len, SmartPacket& sp)
+{
+	for (int i = 0; i < len; ++i)
+	{
+		for (ULONGLONG otherSessionId : listArr[pPosArr[i].first][pPosArr[i].second])
+		{
+			g_ChatServer.SendPacket(otherSessionId, sp);
+			InterlockedIncrement(&g_ChatServer.REQ_MESSAGE_TPS);
+		}
+	}
+
 }

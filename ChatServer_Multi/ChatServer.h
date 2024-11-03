@@ -10,8 +10,10 @@ public:
 	virtual void OnRelease(ULONGLONG id);
 	virtual void OnRecv(ULONGLONG id, Packet* pPacket);
 	virtual void OnError(ULONGLONG id, int errorType, Packet* pRcvdPacket);
-	void Monitoring(int updateCnt, unsigned long long BuffersProcessAtThisFrame);
+	virtual void OnPost(int order);
+	void Monitoring();
 	void DisconnectAll();
 	LONG REQ_MESSAGE_TPS = 0;
 	LONG RES_MESSAGE_TPS = 0;
+	LONG PQCS_UPDATE_CNT_ = 0;
 };
