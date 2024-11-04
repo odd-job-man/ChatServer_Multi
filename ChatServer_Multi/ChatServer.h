@@ -16,4 +16,6 @@ public:
 	LONG REQ_MESSAGE_TPS = 0;
 	LONG RES_MESSAGE_TPS = 0;
 	LONG PQCS_UPDATE_CNT_ = 0;
+	HANDLE hUpdateThreadEvent_;
+	LONG updateThreadWakeCount_ = 0;
 };

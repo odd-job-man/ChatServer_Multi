@@ -36,6 +36,17 @@ ChatServer::ChatServer()
 			GetSectorAround(x, y, &g_sectorAround[y][x]);
 		}
 	}
+
+	hUpdateThreadEvent_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (hUpdateThreadEvent_ == NULL)
+		__debugbreak();
+
+	InitializeSRWLock(&Player::playerArrLock);
+
+	for (DWORD i = 0; i < IOCP_WORKER_THREAD_NUM_; ++i)
+		ResumeThread(hIOCPWorkerThreadArr_[i]);
+
+	ResumeThread(hAcceptThread_);
 }
 
 BOOL ChatServer::OnConnectionRequest()
@@ -51,24 +62,20 @@ void* ChatServer::OnAccept(ULONGLONG id)
 	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(id);
 	// 컨텐츠에서 해당 플레이어 포인터를 사용하던 중에 재활용 되는것을 막기
 
-	if (pPlayer->bUsing_ == true)
-		__debugbreak();
-
+	AcquireSRWLockShared(&Player::playerArrLock);
 	pPlayer->bUsing_ = true;
 	pPlayer->bLogin_ = false;
 	pPlayer->bRegisterAtSector_ = false;
 	pPlayer->sessionId_ = id;
 	pPlayer->LastRecvedTime_ = GetTickCount64();
+	ReleaseSRWLockShared(&Player::playerArrLock);
 	return nullptr;
 }
 
 void ChatServer::OnRelease(ULONGLONG id)
 {
 	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(id);
-
-	if (pPlayer->bUsing_ == false)
-		__debugbreak();
-
+	AcquireSRWLockShared(&Player::playerArrLock);
 	pPlayer->bUsing_ = false;
 	if (pPlayer->bLogin_ == true)
 	{
@@ -80,13 +87,16 @@ void ChatServer::OnRelease(ULONGLONG id)
 		}
 		InterlockedDecrement(&lPlayerNum);
 	}
+	ReleaseSRWLockShared(&Player::playerArrLock);
 }
 
 void ChatServer::OnRecv(ULONGLONG id, Packet* pPacket)
 {
+	AcquireSRWLockShared(&Player::playerArrLock);
 	SmartPacket sp = std::move(pPacket);
 	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(id);
 	PacketProc_PACKET(pPlayer, sp);
+	ReleaseSRWLockShared(&Player::playerArrLock);
 }
 
 void ChatServer::OnError(ULONGLONG id, int errorType, Packet* pRcvdPacket)

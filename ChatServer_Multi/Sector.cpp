@@ -110,13 +110,13 @@ void SendPacket_Sector_One(ULONGLONG sessionId, WORD sectorX, WORD sectorY, Smar
 	}
 }
 
-void SendPacket_Sector_Multiple(ULONGLONG sessionId, std::pair<WORD, WORD>* pPosArr, int len, SmartPacket& sp)
+void SendPacket_Sector_Multiple(ULONGLONG sessionId, std::pair<WORD, WORD>* pPosArr, int len, Packet* pPacket)
 {
 	for (int i = 0; i < len; ++i)
 	{
 		for (ULONGLONG otherSessionId : listArr[pPosArr[i].first][pPosArr[i].second])
 		{
-			g_ChatServer.SendPacket(otherSessionId, sp);
+			g_ChatServer.SendPacket_ALREADY_ENCODED(otherSessionId, pPacket);
 			InterlockedIncrement(&g_ChatServer.REQ_MESSAGE_TPS);
 		}
 	}

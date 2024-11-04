@@ -19,7 +19,7 @@ struct SECTOR_AROUND
 void GetSectorAround(SHORT sectorX, SHORT sectorY, SECTOR_AROUND* pOutSectorAround);
 void SendPacket_AROUND(ULONGLONG sessionId, SECTOR_AROUND* pSectorAround, SmartPacket& sp);
 void SendPacket_Sector_One(ULONGLONG sessionId, WORD sectorX, WORD sectorY, SmartPacket& sp);
-void SendPacket_Sector_Multiple(ULONGLONG sessionId, std::pair<WORD, WORD>* pPosArr, int len, SmartPacket& sp);
+void SendPacket_Sector_Multiple(ULONGLONG sessionId, std::pair<WORD, WORD>* pPosArr, int len, Packet* pPacket);
 void RegisterClientAtSector(WORD sectorX, WORD sectorY, ULONGLONG sesssionId);
 void RemoveClientAtSector(WORD sectorX, WORD sectorY, ULONGLONG sessionId);
 

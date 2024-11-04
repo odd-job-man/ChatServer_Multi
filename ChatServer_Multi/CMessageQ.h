@@ -7,7 +7,6 @@ class CMessageQ;
 struct Job;
 #include "Job.h"
 
-#define NO_LOCK
 class CMessageQ
 {
 public:

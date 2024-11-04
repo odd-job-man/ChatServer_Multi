@@ -7,6 +7,10 @@
 #include "Job.h"
 #include "CSCContents.h"
 #include "SCCContents.h"
+#include <stdio.h>
+
+int g_temp = 0;
+HANDLE hEvent;
 
 thread_local int g_threadNumber;
 
@@ -31,6 +35,7 @@ void CS_CHAT_REQ_LOGIN(Player* pPlayer, SmartPacket& sp)
 	pPlayer->LastRecvedTime_ = GetTickCount64();
 	pPlayer->accountNo_ = AccountNo;
 	pPlayer->bLogin_ = true;
+	pPlayer->sectorX_ = pPlayer->sectorY_ = -1;
 
 	wcscpy_s(pPlayer->ID_, Player::ID_LEN, pID);
 	wcscpy_s(pPlayer->nickName_, Player::NICK_NAME_LEN, pNickName);
@@ -67,13 +72,21 @@ void CS_CHAT_REQ_SECTOR_MOVE(Player* pPlayer, SmartPacket& sp)
 		return;
 	}
 
-	Packet* pPacket = PACKET_ALLOC(Net);
-	MAKE_CS_CHAT_RES_SECTOR_MOVE(pPlayer->accountNo_, pPlayer->sectorX_, pPlayer->sectorY_, pPacket);
+	Packet* pCS_CHAT_RES_SECTOR_MOVE = PACKET_ALLOC(Net);
+	MAKE_CS_CHAT_RES_SECTOR_MOVE(pPlayer->accountNo_, pPlayer->sectorX_, pPlayer->sectorY_, pCS_CHAT_RES_SECTOR_MOVE);
 
-	Job* pREQ_SECTOR_MOVE_ADD_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_ADD, sectorX, sectorY, pPlayer->sessionId_, pPacket);
+	// 이전좌표와 같은 좌표로 SectorMove가 오는경우가 잇어서 일단 예외처리함
+	// 그대로 내버려두면 리스트에 같은 세션아이디가 잇는 경우가 생김
+	if (sectorX == pPlayer->sectorX_ && sectorY == pPlayer->sectorY_)
+	{
+		g_ChatServer.SendPacket(pPlayer->sessionId_, pCS_CHAT_RES_SECTOR_MOVE);
+		return;
+	}
+
+	Job* pREQ_SECTOR_MOVE_ADD_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_ADD, sectorX, sectorY, pPlayer->sessionId_, pCS_CHAT_RES_SECTOR_MOVE);
+	//Job::WRITE_JOB_LOG(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_ADD, sectorX, sectorY, pPlayer->accountNo_);
 	Job* pREQ_SECTOR_MOVE_REMOVE_JOB;
 
-	
 	Job::Enqueue(pREQ_SECTOR_MOVE_ADD_JOB, GetOrder(sectorX, sectorY));
 
 	if (pPlayer->bRegisterAtSector_ == false)
@@ -82,6 +95,7 @@ void CS_CHAT_REQ_SECTOR_MOVE(Player* pPlayer, SmartPacket& sp)
 	{
 		pREQ_SECTOR_MOVE_REMOVE_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_REMOVE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->sessionId_, nullptr);
 		Job::Enqueue(pREQ_SECTOR_MOVE_REMOVE_JOB, GetOrder(pPlayer->sectorX_, pPlayer->sectorY_));
+		//Job::WRITE_JOB_LOG(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_REMOVE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->accountNo_);
 	}
 
 	// 플레이어 섹터좌표 수정
@@ -93,8 +107,7 @@ void CS_CHAT_REQ_SECTOR_MOVE(Player* pPlayer, SmartPacket& sp)
 void CS_CHAT_REQ_SECTOR_MOVE_JOB_ADD(Job* pJob)
 {
 	RegisterClientAtSector(pJob->sectorX_, pJob->sectorY_, pJob->sessionId_);
-	SmartPacket sp = std::move(pJob->pPacket_);
-	g_ChatServer.SendPacket(pJob->sessionId_, sp);
+	g_ChatServer.SendPacket(pJob->sessionId_, pJob->pPacket_);
 }
 
 void CS_CHAT_REQ_MESSAGE(Player* pPlayer, SmartPacket& sp)
@@ -122,24 +135,36 @@ void CS_CHAT_REQ_MESSAGE(Player* pPlayer, SmartPacket& sp)
 	// 잡 처리용 스레드들에게 뿌릴 직렬화버퍼를 만든다 
 	Packet* pResPacket = PACKET_ALLOC(Net);
 	MAKE_CS_CHAT_RES_MESSAGE(accountNo, pPlayer->ID_, pPlayer->nickName_, messageLen, pMessage, pResPacket);
+	pResPacket->SetHeader<Net>();
+	//Job::WRITE_JOB_LOG(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_MESSAGE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->accountNo_);
 
 	// Job에 직렬화버퍼를 등록함
 	Job* pJob = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_MESSAGE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->sessionId_, pResPacket);
 
 	SECTOR_AROUND* pSectorAround = &g_sectorAround[pPlayer->sectorY_][pPlayer->sectorX_];
 	bool bQuadrantArr[4] = { false };
+	BYTE orderArr[4];
+
+	int numberOfDifferentOrder = 0;
 	for (int i = 0; i < pSectorAround->sectorCount; ++i)
 	{
 		int order = GetOrder(pSectorAround->Around[i].sectorX, pSectorAround->Around[i].sectorY);
 		if (bQuadrantArr[order] == false)
 		{
 			bQuadrantArr[order] = true;
-			Job::Enqueue(pJob, order);
+			orderArr[numberOfDifferentOrder] = order;
+			++numberOfDifferentOrder;
 		}
+	}
+
+	InterlockedAdd(&pResPacket->refCnt_, numberOfDifferentOrder);
+	for (int i = 0; i < numberOfDifferentOrder; ++i)
+	{
+		Job::Enqueue(pJob, orderArr[i]);
 	}
 }
 
-__forceinline int GetPosArr(std::pair<WORD, WORD>* pOutPosArr, SECTOR_AROUND* pSectorAround, int order)
+__forceinline int determineOrderedPosition(std::pair<WORD, WORD>* pOutPosArr, SECTOR_AROUND* pSectorAround, int order)
 {
 	int len = 0;
 	WORD quadrantY = order / 2;
@@ -162,11 +187,15 @@ __forceinline int GetPosArr(std::pair<WORD, WORD>* pOutPosArr, SECTOR_AROUND* pS
 
 void CS_CHAT_REQ_MESSAGE_JOB(Job* pJob, int order)
 {
-	SmartPacket sp = std::move(pJob->pPacket_);
+	Packet* pPacket = pJob->pPacket_;
 	SECTOR_AROUND* pSectorAround = &g_sectorAround[pJob->sectorY_][pJob->sectorX_];
-	std::pair<WORD, WORD> pPosArr[9];
-	int len = GetPosArr(pPosArr, pSectorAround, order);
-	SendPacket_Sector_Multiple(pJob->sessionId_, pPosArr, len, sp);
+
+	std::pair<WORD, WORD> pPosition[9];
+	int posNum = determineOrderedPosition(pPosition, pSectorAround, order);
+
+	SendPacket_Sector_Multiple(pJob->sessionId_, pPosition, posNum, pPacket);
+	if (pPacket->DecrementRefCnt() == 0)
+		Packet::Free(pJob->pPacket_);
 }
 
 bool PacketProc_JOB(Job* pJob, int order)
@@ -193,22 +222,22 @@ bool PacketProc_JOB(Job* pJob, int order)
 
 void PQCS(int order)
 {
-	if (order < 0 || order >= 4)
-		__debugbreak();
-
 	Job::Swap(order);
 	while (true)
 	{
 		Job* pJob = Job::Dequeue(order);
 		if (pJob == nullptr)
-			return;
+			break;
 
 		PacketProc_JOB(pJob, order);
 		InterlockedIncrement(&g_ChatServer.PQCS_UPDATE_CNT_);
 
-		if (InterlockedDecrement(&pJob->refCnt_))
+		if (InterlockedDecrement(&pJob->refCnt_) == 0)
 			Job::Free(pJob);
 	}
+
+	if (InterlockedDecrement(&g_ChatServer.updateThreadWakeCount_) == 0)
+		SetEvent(g_ChatServer.hUpdateThreadEvent_);
 }
 
 void CS_CHAT_REQ_HEARTBEAT(Player* pPlayer)

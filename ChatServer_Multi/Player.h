@@ -8,6 +8,7 @@ struct Player
 	static constexpr int SESSION_KEY_LEN = 64;
 	static inline int MAX_PLAYER_NUM;
 	static inline Player* pPlayerArr;
+	static inline SRWLOCK playerArrLock;
 	static constexpr int INITIAL_SECTOR_VALUE = 51;
 
 	bool bUsing_;
