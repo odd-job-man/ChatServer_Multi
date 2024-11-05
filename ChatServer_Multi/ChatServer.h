@@ -1,10 +1,12 @@
 #pragma once
 #include <NetServer.h>
+#include "HMonitor.h"
 
 class ChatServer : public NetServer
 {
 public:
 	ChatServer();
+	static inline HMonitor monitor;
 	virtual BOOL OnConnectionRequest();
 	virtual void* OnAccept(ULONGLONG id);
 	virtual void OnRelease(ULONGLONG id);

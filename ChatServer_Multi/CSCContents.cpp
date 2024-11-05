@@ -192,6 +192,7 @@ void CS_CHAT_REQ_MESSAGE_JOB(Job* pJob, int order)
 	std::pair<WORD, WORD> pPosition[9];
 	int posNum = determineOrderedPosition(pPosition, pSectorAround, order);
 
+	InterlockedIncrement(&g_ChatServer.REQ_MESSAGE_TPS);
 	SendPacket_Sector_Multiple(pJob->sessionId_, pPosition, posNum, pPacket);
 	if (pPacket->DecrementRefCnt() == 0)
 		Packet::Free(pJob->pPacket_);

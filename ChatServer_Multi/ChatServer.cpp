@@ -13,6 +13,8 @@
 
 #include "Parser.h"
 
+#pragma comment(lib,"pdh.lib")
+
 bool PacketProc_PACKET(Player* pPlayer, SmartPacket& rcvdPacket);
 extern SECTOR_AROUND g_sectorAround[50][50];
 
@@ -144,6 +146,7 @@ void ChatServer::Monitoring()
 		workerEnqueuedBufCnt = Job::messageQ[i].workerEnqueuedBufferCnt_;
 	}
 
+	monitor.UpdateCpuTime();
 	printf(
 		"update Count : %d\n"
 		"Packet Pool Alloc Capacity : %d\n"
@@ -158,7 +161,14 @@ void ChatServer::Monitoring()
 		"Session Num : %d\n"
 		"Player Num : %d\n"
 		"REQ_MESSAGE_TPS : %d\n"
-		"RES_MESSAGE_TPS : %d\n\n",
+		"RES_MESSAGE_TPS : %d\n"
+		"----------------------\n"
+		"Process Private MBytes : %.2lf\n"
+		"Process NP Pool KBytes : %.2lf\n"
+		"Memory Available MBytes : %.2lf\n"
+		"Machine NP Pool MBytes : %.2lf\n"
+		"Processor CPU Time : %.2f\n"
+		"Process CPU Time : %.2f\n\n",
 		PQCS_UPDATE_CNT_,
 		Packet::packetPool_.capacity_,
 		cap,
@@ -172,16 +182,22 @@ void ChatServer::Monitoring()
 		lSessionNum_,
 		lPlayerNum,
 		REQ_MESSAGE_TPS,
-		RES_MESSAGE_TPS);
+		RES_MESSAGE_TPS,
+		monitor.GetPPB() / (1024 * 1024),
+		monitor.GetPNPB() / 1024,
+		monitor.GetAB(),
+		monitor.GetNPB() / (1024 * 1024),
+		monitor._fProcessorTotal,
+		monitor._fProcessTotal
+	);
 
-	lAcceptTotal_PREV = lAcceptTotal_;
-
+	InterlockedExchange(&lAcceptTotal_PREV, lAcceptTotal_);
 	InterlockedExchange(&PQCS_UPDATE_CNT_, 0);
 	InterlockedExchange(&lDisconnectTPS_, 0);
 	InterlockedExchange(&lRecvTPS_, 0);
 	InterlockedExchange(&lSendTPS_, 0);
-	REQ_MESSAGE_TPS = 0;
-	RES_MESSAGE_TPS = 0;
+	InterlockedExchange(&REQ_MESSAGE_TPS, 0);
+	InterlockedExchange(&RES_MESSAGE_TPS, 0);
 }
 
 void ChatServer::DisconnectAll()

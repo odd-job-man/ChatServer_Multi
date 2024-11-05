@@ -141,6 +141,7 @@
     <ClInclude Include="..\..\NetServer\NetServer\CLockFreeStack.h" />
     <ClInclude Include="..\..\NetServer\NetServer\CTlsObjectPool.h" />
     <ClInclude Include="..\..\NetServer\NetServer\ErrType.h" />
+    <ClInclude Include="..\..\NetServer\NetServer\HMonitor.h" />
     <ClInclude Include="..\..\NetServer\NetServer\IHandler.h" />
     <ClInclude Include="..\..\NetServer\NetServer\Logger.h" />
     <ClInclude Include="..\..\NetServer\NetServer\NetServer.h" />
@@ -158,6 +159,7 @@
     <ClInclude Include="TimeOutLock.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\NetServer\NetServer\HMonitor.cpp" />
     <ClCompile Include="..\..\NetServer\NetServer\NetServer.cpp" />
     <ClCompile Include="..\..\NetServer\NetServer\RingBuffer.cpp" />
     <ClCompile Include="..\..\NetServer\NetServer\Session.cpp" />
