@@ -25,6 +25,14 @@ ChatServer::ChatServer()
 
 	GetValue(psr, L"USER_MAX", (PVOID*)&pStart, nullptr);
 	Player::MAX_PLAYER_NUM = (short)_wtoi((LPCWSTR)pStart);
+
+	GetValue(psr, L"TICK_PER_FRAME", (PVOID*)&pStart, nullptr);
+	TICK_PER_FRAME_ = _wtoi((LPCWSTR)pStart);
+
+	GetValue(psr, L"SESSION_TIMEOUT", (PVOID*)&pStart, nullptr);
+	SESSION_TIMEOUT_ = (ULONGLONG)_wtoi64((LPCWSTR)pStart);
+	GetValue(psr, L"PLAYER_TIMEOUT", (PVOID*)&pStart, nullptr);
+	PLAYER_TIMEOUT_ = (ULONGLONG)_wtoi64((LPCWSTR)pStart);
 	ReleaseParser(psr);
 
 	Player::pPlayerArr = new Player[maxSession_];
@@ -43,6 +51,9 @@ ChatServer::ChatServer()
 
 	InitializeSRWLock(&Player::playerArrLock);
 
+	for (int i = 0; i < _countof(Player::accountNoMapRock_); ++i)
+		InitializeSRWLock(&Player::accountNoMapRock_[i]);
+
 	for (DWORD i = 0; i < IOCP_WORKER_THREAD_NUM_; ++i)
 		ResumeThread(hIOCPWorkerThreadArr_[i]);
 
@@ -60,22 +71,20 @@ BOOL ChatServer::OnConnectionRequest()
 void* ChatServer::OnAccept(ULONGLONG id)
 {
 	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(id);
-	// 컨텐츠에서 해당 플레이어 포인터를 사용하던 중에 재활용 되는것을 막기
-
-	AcquireSRWLockShared(&Player::playerArrLock);
+	Player::timeOutLock_.AcquireShared();
 	pPlayer->bUsing_ = true;
 	pPlayer->bLogin_ = false;
 	pPlayer->bRegisterAtSector_ = false;
 	pPlayer->sessionId_ = id;
 	pPlayer->LastRecvedTime_ = GetTickCount64();
-	ReleaseSRWLockShared(&Player::playerArrLock);
+	Player::timeOutLock_.ReleaseShared();
 	return nullptr;
 }
 
 void ChatServer::OnRelease(ULONGLONG id)
 {
 	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(id);
-	AcquireSRWLockShared(&Player::playerArrLock);
+	Player::timeOutLock_.AcquireShared();
 	pPlayer->bUsing_ = false;
 	if (pPlayer->bLogin_ == true)
 	{
@@ -87,16 +96,16 @@ void ChatServer::OnRelease(ULONGLONG id)
 		}
 		InterlockedDecrement(&lPlayerNum);
 	}
-	ReleaseSRWLockShared(&Player::playerArrLock);
+	Player::timeOutLock_.ReleaseShared();
 }
 
 void ChatServer::OnRecv(ULONGLONG id, Packet* pPacket)
 {
-	AcquireSRWLockShared(&Player::playerArrLock);
+	Player::timeOutLock_.AcquireShared();
 	SmartPacket sp = std::move(pPacket);
 	Player* pPlayer = Player::pPlayerArr + Player::MAKE_PLAYER_INDEX(id);
 	PacketProc_PACKET(pPlayer, sp);
-	ReleaseSRWLockShared(&Player::playerArrLock);
+	Player::timeOutLock_.ReleaseShared();
 }
 
 void ChatServer::OnError(ULONGLONG id, int errorType, Packet* pRcvdPacket)

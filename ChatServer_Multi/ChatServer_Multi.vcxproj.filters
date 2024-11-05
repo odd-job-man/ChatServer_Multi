@@ -87,6 +87,9 @@
     <ClInclude Include="ChatServer.h">
       <Filter>헤더 파일\ChatServerHeader</Filter>
     </ClInclude>
+    <ClInclude Include="TimeOutLock.h">
+      <Filter>헤더 파일\ChatServerHeader</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\NetServer\NetServer\RingBuffer.cpp">

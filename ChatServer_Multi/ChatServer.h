@@ -18,4 +18,7 @@ public:
 	LONG PQCS_UPDATE_CNT_ = 0;
 	HANDLE hUpdateThreadEvent_;
 	LONG updateThreadWakeCount_ = 0;
+	LONG TICK_PER_FRAME_;
+	ULONGLONG SESSION_TIMEOUT_;
+	ULONGLONG PLAYER_TIMEOUT_;
 };

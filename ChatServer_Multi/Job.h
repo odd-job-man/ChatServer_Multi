@@ -32,7 +32,6 @@ public:
 	LONG refCnt_;
 	static CMessageQ messageQ[4];
 	static inline CTlsObjectPool<Job,true> jobPool_;
-	//static inline std::list<JobLog>JobListArr[10000];
 
 	Job(en_JOB_TYPE jobType, WORD sectorX, WORD sectorY, ULONGLONG sessionId, Packet* pPacket = nullptr)
 		:jobType_{ jobType }, sectorX_{ sectorX }, sectorY_{ sectorY }, sessionId_{ sessionId }, pPacket_{ pPacket }, refCnt_{ 0 }

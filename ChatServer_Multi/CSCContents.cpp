@@ -32,6 +32,12 @@ void CS_CHAT_REQ_LOGIN(Player* pPlayer, SmartPacket& sp)
 	WCHAR* pNickName = (WCHAR*)sp->GetPointer(sizeof(WCHAR) * Player::NICK_NAME_LEN);
 	char* pSessionKey = (char*)sp->GetPointer(sizeof(char) * Player::SESSION_KEY_LEN);
 
+	if (sp->IsBufferEmpty() == false)
+	{
+		g_ChatServer.Disconnect(pPlayer->sessionId_);
+		return;
+	}
+
 	pPlayer->LastRecvedTime_ = GetTickCount64();
 	pPlayer->accountNo_ = AccountNo;
 	pPlayer->bLogin_ = true;
@@ -84,18 +90,14 @@ void CS_CHAT_REQ_SECTOR_MOVE(Player* pPlayer, SmartPacket& sp)
 	}
 
 	Job* pREQ_SECTOR_MOVE_ADD_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_ADD, sectorX, sectorY, pPlayer->sessionId_, pCS_CHAT_RES_SECTOR_MOVE);
-	//Job::WRITE_JOB_LOG(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_ADD, sectorX, sectorY, pPlayer->accountNo_);
-	Job* pREQ_SECTOR_MOVE_REMOVE_JOB;
-
 	Job::Enqueue(pREQ_SECTOR_MOVE_ADD_JOB, GetOrder(sectorX, sectorY));
 
 	if (pPlayer->bRegisterAtSector_ == false)
 		pPlayer->bRegisterAtSector_ = true;
 	else
 	{
-		pREQ_SECTOR_MOVE_REMOVE_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_REMOVE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->sessionId_, nullptr);
+		Job* pREQ_SECTOR_MOVE_REMOVE_JOB = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_REMOVE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->sessionId_, nullptr);
 		Job::Enqueue(pREQ_SECTOR_MOVE_REMOVE_JOB, GetOrder(pPlayer->sectorX_, pPlayer->sectorY_));
-		//Job::WRITE_JOB_LOG(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_SECTOR_MOVE_REMOVE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->accountNo_);
 	}
 
 	// 플레이어 섹터좌표 수정
@@ -136,7 +138,6 @@ void CS_CHAT_REQ_MESSAGE(Player* pPlayer, SmartPacket& sp)
 	Packet* pResPacket = PACKET_ALLOC(Net);
 	MAKE_CS_CHAT_RES_MESSAGE(accountNo, pPlayer->ID_, pPlayer->nickName_, messageLen, pMessage, pResPacket);
 	pResPacket->SetHeader<Net>();
-	//Job::WRITE_JOB_LOG(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_MESSAGE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->accountNo_);
 
 	// Job에 직렬화버퍼를 등록함
 	Job* pJob = Job::Alloc(en_JOB_TYPE::en_JOB_CS_CHAT_REQ_MESSAGE, pPlayer->sectorX_, pPlayer->sectorY_, pPlayer->sessionId_, pResPacket);
@@ -159,9 +160,7 @@ void CS_CHAT_REQ_MESSAGE(Player* pPlayer, SmartPacket& sp)
 
 	InterlockedAdd(&pResPacket->refCnt_, numberOfDifferentOrder);
 	for (int i = 0; i < numberOfDifferentOrder; ++i)
-	{
 		Job::Enqueue(pJob, orderArr[i]);
-	}
 }
 
 __forceinline int determineOrderedPosition(std::pair<WORD, WORD>* pOutPosArr, SECTOR_AROUND* pSectorAround, int order)

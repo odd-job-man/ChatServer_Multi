@@ -10,27 +10,27 @@
 
 extern ChatServer g_ChatServer;
 
-constexpr int SESSION_TIMEOUT = 3000;
-constexpr int PLAYER_TIMEOUT = 4000 * 10;
-
 void Update()
 {
 	static unsigned long long timeOutCheck = GetTickCount64();
 	static unsigned long long firstTimeOutCheck = timeOutCheck;
 
 	g_ChatServer.updateThreadWakeCount_ = 4;
+
 	PostQueuedCompletionStatus(g_ChatServer.hcp_, 1, 1, 0);
 	PostQueuedCompletionStatus(g_ChatServer.hcp_, 1, 1, (LPOVERLAPPED)1);
 	PostQueuedCompletionStatus(g_ChatServer.hcp_, 1, 1, (LPOVERLAPPED)2);
 	PostQueuedCompletionStatus(g_ChatServer.hcp_, 1, 1, (LPOVERLAPPED)3);
+
 	WaitForSingleObject(g_ChatServer.hUpdateThreadEvent_, INFINITE);
 
+	// 매번 타임아웃 처리하려고 락따고 시간구하는건 낭비라서 일단 구하고 마지막으로부터 지정된 시간만큼 지나면 락따고들어가서 다시 시간구하고 그때부터 타임아웃 처리함
 	unsigned long long currentTime = GetTickCount64();
-	 //3초에 한번씩 타임아웃 체크함(우선 하드코딩)
-	if (currentTime - timeOutCheck <= SESSION_TIMEOUT)
+	if (currentTime - timeOutCheck <= g_ChatServer.SESSION_TIMEOUT_)
 		return;
 
-	AcquireSRWLockExclusive(&Player::playerArrLock);
+	Player::timeOutLock_.AcquireExclusive();
+	currentTime = GetTickCount64();
 	for (int i = 0; i < g_ChatServer.maxSession_; ++i)
 	{
 		Player* pPlayer = Player::pPlayerArr + i;
@@ -40,19 +40,19 @@ void Update()
 		if (pPlayer->bLogin_ == true)
 		{
 			//40초 지나면 타임 아웃 처리
-			if (currentTime - pPlayer->LastRecvedTime_ > PLAYER_TIMEOUT)
+			if (currentTime - pPlayer->LastRecvedTime_ > g_ChatServer.PLAYER_TIMEOUT_)
 				g_ChatServer.Disconnect(pPlayer->sessionId_);
 		}
 		else
 		{
 			// 로그인하지 않은 세션은 3초 지나면 타임아웃
-			if (currentTime - pPlayer->LastRecvedTime_ > SESSION_TIMEOUT)
-				g_ChatServer.Disconnect(pPlayer->sessionId_);
+			//if (currentTime - pPlayer->LastRecvedTime_ > SESSION_TIMEOUT)
+			//	g_ChatServer.Disconnect(pPlayer->sessionId_);
 		}
 
 	}
-	timeOutCheck += timeOutCheck - ((timeOutCheck - firstTimeOutCheck) % SESSION_TIMEOUT);
-	ReleaseSRWLockExclusive(&Player::playerArrLock);
+	timeOutCheck += timeOutCheck - ((timeOutCheck - firstTimeOutCheck) % g_ChatServer.SESSION_TIMEOUT_);
+	Player::timeOutLock_.ReleaseExclusive();
 }
 
 bool PacketProc_PACKET(Player* pPlayer, SmartPacket& rcvdPacket)
