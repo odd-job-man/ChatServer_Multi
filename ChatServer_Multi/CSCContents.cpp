@@ -38,7 +38,6 @@ void CS_CHAT_REQ_LOGIN(Player* pPlayer, SmartPacket& sp)
 		return;
 	}
 
-	pPlayer->LastRecvedTime_ = GetTickCount64();
 	pPlayer->accountNo_ = AccountNo;
 	pPlayer->bLogin_ = true;
 	pPlayer->sectorX_ = pPlayer->sectorY_ = -1;
@@ -132,7 +131,6 @@ void CS_CHAT_REQ_MESSAGE(Player* pPlayer, SmartPacket& sp)
 		g_ChatServer.Disconnect(pPlayer->sessionId_);
 		return;
 	}
-	pPlayer->LastRecvedTime_ = GetTickCount64();
 
 	// 잡 처리용 스레드들에게 뿌릴 직렬화버퍼를 만든다 
 	Packet* pResPacket = PACKET_ALLOC(Net);
@@ -178,9 +176,6 @@ __forceinline int determineOrderedPosition(std::pair<WORD, WORD>* pOutPosArr, SE
 		}
 	}
 
-	if (len == 0)
-		__debugbreak();
-
 	return len;
 }
 
@@ -192,7 +187,6 @@ void CS_CHAT_REQ_MESSAGE_JOB(Job* pJob, int order)
 	std::pair<WORD, WORD> pPosition[9];
 	int posNum = determineOrderedPosition(pPosition, pSectorAround, order);
 
-	InterlockedIncrement(&g_ChatServer.REQ_MESSAGE_TPS);
 	SendPacket_Sector_Multiple(pJob->sessionId_, pPosition, posNum, pPacket);
 	if (pPacket->DecrementRefCnt() == 0)
 		Packet::Free(pJob->pPacket_);
@@ -230,7 +224,6 @@ void PQCS(int order)
 			break;
 
 		PacketProc_JOB(pJob, order);
-		InterlockedIncrement(&g_ChatServer.PQCS_UPDATE_CNT_);
 
 		if (InterlockedDecrement(&pJob->refCnt_) == 0)
 			Job::Free(pJob);

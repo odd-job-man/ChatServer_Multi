@@ -14,9 +14,6 @@ int g_iTime;
 int g_iFPS;
 int g_iFirst;
 
-constexpr int TICK_PER_FRAME = 10;
-constexpr int FRAME_PER_SECONDS = (1000) / TICK_PER_FRAME;
-
 extern ChatServer g_ChatServer;
 
 void Update();

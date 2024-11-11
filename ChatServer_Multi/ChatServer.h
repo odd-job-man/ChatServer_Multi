@@ -6,7 +6,6 @@ class ChatServer : public NetServer
 {
 public:
 	ChatServer();
-	static inline HMonitor monitor;
 	virtual BOOL OnConnectionRequest();
 	virtual void* OnAccept(ULONGLONG id);
 	virtual void OnRelease(ULONGLONG id);
@@ -15,12 +14,13 @@ public:
 	virtual void OnPost(int order);
 	void Monitoring();
 	void DisconnectAll();
-	LONG REQ_MESSAGE_TPS = 0;
-	LONG RES_MESSAGE_TPS = 0;
-	LONG PQCS_UPDATE_CNT_ = 0;
 	HANDLE hUpdateThreadEvent_;
 	LONG updateThreadWakeCount_ = 0;
 	LONG TICK_PER_FRAME_;
 	ULONGLONG SESSION_TIMEOUT_;
 	ULONGLONG PLAYER_TIMEOUT_;
+	ULONGLONG RECV_TOTAL_ = 0;
+	ULONGLONG PROCESS_CPU_TICK_ELAPSED = 0;
+	ULONGLONG PROCESS_CPU_TICK_TIME_DIFF = 0;
+	static inline HMonitor monitor;
 };

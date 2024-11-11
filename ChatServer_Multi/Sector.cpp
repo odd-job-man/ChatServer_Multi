@@ -96,7 +96,6 @@ void SendPacket_AROUND(ULONGLONG sessionId, SECTOR_AROUND* pSectorAround, SmartP
 		for (ULONGLONG otherSessionId : listArr[pSectorAround->Around[i].sectorY][pSectorAround->Around[i].sectorX])
 		{
 			g_ChatServer.SendPacket(otherSessionId, sp);
-			InterlockedIncrement(&g_ChatServer.RES_MESSAGE_TPS);
 		}
 	}
 }
@@ -106,7 +105,6 @@ void SendPacket_Sector_One(ULONGLONG sessionId, WORD sectorX, WORD sectorY, Smar
 	for (ULONGLONG otherSessionId : listArr[sectorY][sectorX])
 	{
 		g_ChatServer.SendPacket(otherSessionId, sp);
-		InterlockedIncrement(&g_ChatServer.RES_MESSAGE_TPS);
 	}
 }
 
@@ -117,7 +115,6 @@ void SendPacket_Sector_Multiple(ULONGLONG sessionId, std::pair<WORD, WORD>* pPos
 		for (ULONGLONG otherSessionId : listArr[pPosArr[i].first][pPosArr[i].second])
 		{
 			g_ChatServer.SendPacket_ALREADY_ENCODED(otherSessionId, pPacket);
-			InterlockedIncrement(&g_ChatServer.RES_MESSAGE_TPS);
 		}
 	}
 

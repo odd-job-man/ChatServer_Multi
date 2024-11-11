@@ -137,6 +137,31 @@ void ChatServer::OnPost(int order)
 
 void ChatServer::Monitoring()
 {
+	FILETIME ftCreationTime, ftExitTime, ftKernelTime, ftUsertTime;
+	FILETIME ftCurTime;
+	GetProcessTimes(GetCurrentProcess(), &ftCreationTime, &ftExitTime, &ftKernelTime, &ftUsertTime);
+	GetSystemTimeAsFileTime(&ftCurTime);
+
+	ULARGE_INTEGER start, now;
+	start.LowPart = ftCreationTime.dwLowDateTime;
+	start.HighPart = ftCreationTime.dwHighDateTime;
+	now.LowPart = ftCurTime.dwLowDateTime;
+	now.HighPart = ftCurTime.dwHighDateTime;
+
+
+	ULONGLONG ullElapsedSecond = (now.QuadPart - start.QuadPart) / 10000 / 1000;
+
+	ULONGLONG temp = ullElapsedSecond;
+
+	ULONGLONG ullElapsedMin = ullElapsedSecond / 60;
+	ullElapsedSecond %= 60;
+
+	ULONGLONG ullElapsedHour = ullElapsedMin / 60;
+	ullElapsedMin %= 60;
+
+	ULONGLONG ullElapsedDay = ullElapsedHour / 24;
+	ullElapsedHour %= 24;
+
 	int cap = 0;
 	unsigned long long workerEnqueuedBufCnt = 0;
 
@@ -146,58 +171,62 @@ void ChatServer::Monitoring()
 		workerEnqueuedBufCnt = Job::messageQ[i].workerEnqueuedBufferCnt_;
 	}
 
-	monitor.UpdateCpuTime();
+	monitor.UpdateCpuTime(&PROCESS_CPU_TICK_ELAPSED, &PROCESS_CPU_TICK_TIME_DIFF);
+
+
+	ULONGLONG acceptTPS = _InterlockedExchange(&acceptCounter_, 0);
+	acceptTotal_ += acceptTPS;
+	ULONGLONG disconnectTps = InterlockedExchange(&disconnectTPS_, 0);
+	ULONGLONG recvTps = InterlockedExchange(&recvTPS_, 0);
+	RECV_TOTAL_ += recvTps;
+	LONG lSendTps = InterlockedExchange(&lSendTPS_, 0);
+
 	printf(
-		"update Count : %d\n"
+		"Elapsed Time : %02lluD-%02lluH-%02lluMin-%02lluSec\n"
 		"Packet Pool Alloc Capacity : %d\n"
 		"MessageQ Capacity : %d\n"
 		"MessageQ Queued By Worker : %llu\n"
 		"SendQ Pool Capacity : %d\n"
-		"Accept TPS: %d\n"
-		"Accept Total : %d\n"
-		"Disconnect TPS: %d\n"
-		"Recv Msg TPS: %d\n"
+		"Accept TPS: %llu\n"
+		"Accept Total : %llu\n"
+		"Disconnect TPS: %llu\n"
+		"Recv Msg TPS: %llu\n"
 		"Send Msg TPS: %d\n"
 		"Session Num : %d\n"
 		"Player Num : %d\n"
-		"REQ_MESSAGE_TPS : %d\n"
-		"RES_MESSAGE_TPS : %d\n"
+		"RECV TOTAL : %llu\n"
+		"RECV_AVR : %.2f\n"
 		"----------------------\n"
 		"Process Private MBytes : %.2lf\n"
 		"Process NP Pool KBytes : %.2lf\n"
 		"Memory Available MBytes : %.2lf\n"
 		"Machine NP Pool MBytes : %.2lf\n"
 		"Processor CPU Time : %.2f\n"
-		"Process CPU Time : %.2f\n\n",
-		PQCS_UPDATE_CNT_,
+		"Process CPU Time : %.2f\n"
+		"Process CPU Time AVR : %.2f\n\n",
+		ullElapsedDay, ullElapsedHour, ullElapsedMin, ullElapsedSecond,
 		Packet::packetPool_.capacity_,
 		cap,
 		workerEnqueuedBufCnt,
 		pSessionArr_[0].sendPacketQ_.nodePool_.capacity_,
-		lAcceptTotal_ - lAcceptTotal_PREV,
-		lAcceptTotal_,
-		lDisconnectTPS_,
-		lRecvTPS_,
-		lSendTPS_,
+		acceptTPS,
+		acceptTotal_,
+		disconnectTPS_,
+		recvTps,
+		lSendTps,
 		lSessionNum_,
 		lPlayerNum,
-		REQ_MESSAGE_TPS,
-		RES_MESSAGE_TPS,
+		RECV_TOTAL_,
+		RECV_TOTAL_ / (float)temp,
 		monitor.GetPPB() / (1024 * 1024),
 		monitor.GetPNPB() / 1024,
 		monitor.GetAB(),
 		monitor.GetNPB() / (1024 * 1024),
 		monitor._fProcessorTotal,
-		monitor._fProcessTotal
+		monitor._fProcessTotal,
+		(float)(PROCESS_CPU_TICK_ELAPSED / (double)monitor._iNumberOfProcessors / (double)PROCESS_CPU_TICK_TIME_DIFF) * 100.0f
 	);
 
-	InterlockedExchange(&lAcceptTotal_PREV, lAcceptTotal_);
-	InterlockedExchange(&PQCS_UPDATE_CNT_, 0);
-	InterlockedExchange(&lDisconnectTPS_, 0);
-	InterlockedExchange(&lRecvTPS_, 0);
-	InterlockedExchange(&lSendTPS_, 0);
-	InterlockedExchange(&REQ_MESSAGE_TPS, 0);
-	InterlockedExchange(&RES_MESSAGE_TPS, 0);
 }
 
 void ChatServer::DisconnectAll()
